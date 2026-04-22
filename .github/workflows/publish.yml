@@ -76,5 +76,7 @@ jobs:
       id-token: write # IMPORTANT: mandatory for trusted publishing
       contents: read
     steps:
+      - uses: actions/checkout@v4
+
       - name: Publish
         uses: ./.github/actions/publish-pypi
