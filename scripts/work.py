@@ -98,8 +98,10 @@ def main():
         # Check if gh is installed
         run("gh --version")
 
-        # Construct GH command
-
+        # Determine base branch for the PR
+        base = (
+            run(
+                "git remote show origin | grep 'HEAD branch' | cut -d' ' -f5",
                 check=False,
             )
             or DEFAULT_BRANCH
