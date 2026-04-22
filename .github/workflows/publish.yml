@@ -3,8 +3,12 @@ name: Publish
 on:
   push:
     tags:
-      - "v[0-9]+.[0-9]+.[0-9]+"   # e.g. v0.2.0
-      - "v[0-9]+.[0-9]+.[0-9]+-*" # e.g. v0.2.0-rc1
+      - "v[0-9]+.[0-9]+.[0-9]+"   # e.g. v1.2.3
+      - "v[0-9]+.[0-9]+.[0-9]+-*" # e.g. v1.2.3-rc1
+
+  pull_request:
+    types: [closed]
+    branches: [master, main]
 
   workflow_dispatch:
     inputs:
@@ -13,13 +17,66 @@ on:
         type: boolean
         default: false
 
-jobs:
-  build:
-    name: Build distribution
-    runs-on: ubuntu-latest
+# ── jobs ──────────────────────────────────────────────────────────────────────
 
+jobs:
+
+  # Runs only when a PR is merged. Bumps the patch version, commits back to the
+  # base branch with [skip ci], and pushes a vX.Y.Z tag to trigger the release.
+  bump:
+    name: Bump version
+    if: github.event_name == 'pull_request' && github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.bump.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.base.ref }}
+
+      - name: Bump patch version and tag
+        id: bump
+        shell: bash
+        run: |
+          VERSION=$(grep -m1 '^version' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+          TAG="v$NEW_VERSION"
+
+          sed -i "s/version = \"$VERSION\"/version = \"$NEW_VERSION\"/" pyproject.toml
+          sed -i "s/__version__ = \"$VERSION\"/__version__ = \"$NEW_VERSION\"/" src/exegia/__init__.py
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pyproject.toml src/exegia/__init__.py
+          git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
+          git tag "$TAG"
+          git push origin HEAD:${{ github.event.pull_request.base.ref }}
+          git push origin "$TAG"
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Bumped $VERSION → $NEW_VERSION (tag $TAG)"
+
+  # Builds the wheel. Runs after a successful bump, on a tag push, or on
+  # workflow_dispatch. Skips entirely for PRs that were closed without merging.
+  build:
+    name: Build distribution
+    needs: bump
+    if: >-
+      always() && (
+        needs.bump.result == 'success' ||
+        (needs.bump.result == 'skipped' && github.event_name != 'pull_request')
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Use the newly-created tag when bump ran; otherwise the triggering ref.
+          ref: ${{ needs.bump.outputs.tag || github.ref }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -36,29 +93,3 @@ jobs:
           path: dist/
           if-no-files-found: error
 
-  publish:
-    name: Publish to private index
-    needs: build
-    runs-on: ubuntu-latest
-    if: ${{ !inputs.dry_run }}
-    environment: pypi
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
-
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: dist
-          path: dist/
-
-      - name: Publish
-        run: uv publish dist/*
-        env:
-          UV_INDEX_EXEGIA_URL: ${{ secrets.EXEGIA_PYPI_URL }}
-          UV_PUBLISH_URL:      ${{ secrets.EXEGIA_PYPI_PUBLISH_URL }}
-          UV_PUBLISH_USERNAME: ${{ secrets.EXEGIA_PYPI_USERNAME }}
-          UV_PUBLISH_PASSWORD: ${{ secrets.EXEGIA_PYPI_TOKEN }}
