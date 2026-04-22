@@ -35,7 +35,7 @@ from typing import Any, Callable, Dict, List, Optional, Union
 from bs4 import BeautifulSoup, NavigableString, Tag
 from tf.convert.walker import CV
 
-from src.services.epub import extract_pages, get_metadata
+from exegia.services.epub import extract_pages, get_metadata
 
 
 class EPUBToTFConverter:

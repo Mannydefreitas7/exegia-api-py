@@ -4,7 +4,7 @@ from typing import Any
 
 from supabase import Client, create_client
 
-from src.config import settings
+from exegia.config import settings
 
 logger = logging.getLogger(__name__)
 

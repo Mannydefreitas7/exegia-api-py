@@ -38,13 +38,15 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .DS_Store
 
 # Supabase
-.branches
-.temp
-supabase/*.pem
+src/exegia/supabase/.branches
+src/exegia/supabase/.temp
+src/exegia/supabase/*.pem
+
+# publish credentials
+.env.publish
 
 # dotenvx
 .env.keys
 .env.local
 .env.*.local
-supabase/seeds/*_rows.sql
-supabase-py/
+src/exegia/supabase/seeds/*_rows.sql
