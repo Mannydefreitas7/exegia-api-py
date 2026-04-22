@@ -54,31 +54,6 @@ runs:
         echo "tag=$TAG" >> "$GITHUB_OUTPUT"
         echo "Bumped $VERSION → $NEW_VERSION (tag $TAG)"
 
-    - name: Validate token permissions for PR labeling
-      shell: bash
-      run: |
-        set -euo pipefail
-
-        REPO="${{ github.repository }}"
-        PR_NUMBER="${{ inputs.pr_number }}"
-
-        if ! gh api "repos/$REPO" --jq '.permissions.push' >/dev/null 2>&1; then
-          echo "::error::The provided github_token cannot access repository permissions. Workflows calling this action must grant 'permissions: issues: write' and 'permissions: pull-requests: write' to the job GITHUB_TOKEN."
-          exit 1
-        fi
-
-        if [ "$(gh api "repos/$REPO" --jq '.permissions.push')" != "true" ]; then
-          echo "::error::The provided github_token does not have write access to $REPO. The 'Add version label to PR' step requires job permissions 'issues: write' and 'pull-requests: write'."
-          exit 1
-        fi
-
-        if ! gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.number' >/dev/null 2>&1; then
-          echo "::error::The provided github_token cannot access pull request #$PR_NUMBER. Ensure the calling workflow grants 'permissions: pull-requests: write' and 'permissions: issues: write' to the job GITHUB_TOKEN."
-          exit 1
-        fi
-      env:
-        GH_TOKEN: ${{ inputs.github_token }}
-
     - name: Add version label to PR
       shell: bash
       run: |
