@@ -12,6 +12,7 @@ dependencies = [
     "routers",
     "schemas",
     "storage",
+    "utils",
     # Web framework
     "fastapi[standard]>=0.115.0",
     "uvicorn[standard]>=0.30.0",
@@ -42,6 +43,7 @@ dependencies = [
     "beautifulsoup4>=4.12.0",
     "lxml>=5.0.0",
     "uv-mcp>=0.3.0",
+    "dotenvx>=0.0.0",
 ]
 
 [tool.uv.sources]
@@ -51,6 +53,7 @@ models  = { workspace = true }
 schemas = { workspace = true }
 auth = { workspace = true }
 storage = { workspace = true }
+utils = { workspace = true }
 
 [tool.uv.workspace]
 members = [

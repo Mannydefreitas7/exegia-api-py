@@ -418,6 +418,15 @@ wheels = [
 ]
 
 [[package]]
+name = "dotenvx"
+version = "0.0.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/3f/37/a3c03e3a860c2b705b8824c64974759c6bdc7ba42da0da497a8f320b2ea9/dotenvx-0.0.0.tar.gz", hash = "sha256:041240b6a0c01ddd4716d5d3ca9ca9a51173e13e3783c6c09bd1bf5ad7b991e9", size = 1205, upload-time = "2024-06-26T04:37:06.103Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fd/8d/d3af843d8b5fe2fe8d9b4b4aea862df724b2ba54ba370180e9669f08a6f5/dotenvx-0.0.0-py3-none-any.whl", hash = "sha256:d4fa9fe99ba6e122cc843fde6b1fadd11ca313b49dbb3bccff9b52839f1befa1", size = 1216, upload-time = "2024-06-26T04:37:04.741Z" },
+]
+
+[[package]]
 name = "ebooklib"
 version = "0.20"
 source = { registry = "https://pypi.org/simple" }
@@ -473,6 +482,7 @@ dependencies = [
     { name = "asyncpg" },
     { name = "beautifulsoup4" },
     { name = "corpus" },
+    { name = "dotenvx" },
     { name = "ebooklib" },
     { name = "fastapi", extra = ["standard"] },
     { name = "graphql" },
@@ -494,6 +504,7 @@ dependencies = [
     { name = "strawberry-graphql", extra = ["fastapi"] },
     { name = "supabase" },
     { name = "text-fabric" },
+    { name = "utils" },
     { name = "uv-mcp" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -504,6 +515,7 @@ requires-dist = [
     { name = "asyncpg", specifier = ">=0.29.0" },
     { name = "beautifulsoup4", specifier = ">=4.12.0" },
     { name = "corpus", editable = "packages/corpus" },
+    { name = "dotenvx", specifier = ">=0.0.0" },
     { name = "ebooklib", specifier = ">=0.18" },
     { name = "fastapi", extras = ["standard"], specifier = ">=0.115.0" },
     { name = "graphql", editable = "packages/graphql" },
@@ -525,6 +537,7 @@ requires-dist = [
     { name = "strawberry-graphql", extras = ["fastapi"], specifier = ">=0.314.0" },
     { name = "supabase", specifier = ">=2.0.0" },
     { name = "text-fabric", specifier = ">=13.0.0" },
+    { name = "utils", editable = "packages/utils" },
     { name = "uv-mcp", specifier = ">=0.3.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30.0" },
 ]
