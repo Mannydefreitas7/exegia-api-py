@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import datetime
 import os
+from pathlib import Path
 import re
 import subprocess
 import sys
@@ -9,11 +10,14 @@ import sys
 ALLOWED_TYPES = ["fix", "test", "doc", "feature", "cicd", "refactor", "chore"]
 REPO_OWNER = "mannydefreitas7"
 DEFAULT_BRANCH = "master"
+ROOT = Path(__file__).resolve().parent.parent
 
 
 def run(cmd, check=True):
     """Utility to run shell commands and return output."""
-    result = subprocess.run(cmd, shell=True, text=True, capture_output=True)
+    result = subprocess.run(
+        cmd, shell=True, text=True, capture_output=True, cwd=ROOT
+    )
     if check and result.returncode != 0:
         print(f"Error: Command failed -> {cmd}")
         if result.stderr:
