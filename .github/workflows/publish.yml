@@ -1,0 +1,64 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"   # e.g. v0.2.0
+      - "v[0-9]+.[0-9]+.[0-9]+-*" # e.g. v0.2.0-rc1
+
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run — build only, skip publish"
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    name: Build distribution
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Build
+        run: uv build --out-dir dist/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    name: Publish to private index
+    needs: build
+    runs-on: ubuntu-latest
+    if: ${{ !inputs.dry_run }}
+    environment: pypi
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish
+        run: uv publish dist/*
+        env:
+          UV_INDEX_EXEGIA_URL: ${{ secrets.EXEGIA_PYPI_URL }}
+          UV_PUBLISH_URL:      ${{ secrets.EXEGIA_PYPI_PUBLISH_URL }}
+          UV_PUBLISH_USERNAME: ${{ secrets.EXEGIA_PYPI_USERNAME }}
+          UV_PUBLISH_PASSWORD: ${{ secrets.EXEGIA_PYPI_TOKEN }}
