@@ -10,7 +10,7 @@ Two modes:
 
   dispatch (--dispatch)
     Triggers a workflow_dispatch event directly on a branch without touching
-    the version. Useful for re-running a failed publish or dry-run testing.
+    the version. Useful for re-running a failed publish or testing a build.
 
 Note: PRs merged to master/main trigger an automatic patch bump and publish
 via the "Publish" workflow — you do not need this script for day-to-day
@@ -22,8 +22,8 @@ Usage:
     uv run scripts/publish.py minor              # bump minor, tag, push
     uv run scripts/publish.py major              # bump major, tag, push
     uv run scripts/publish.py 1.2.3              # explicit version, tag, push
-    uv run scripts/publish.py --dispatch         # trigger workflow_dispatch on master
-    uv run scripts/publish.py --dispatch --dry-run   # same, build only (no upload)
+    uv run scripts/publish.py --dispatch         # trigger workflow_dispatch on master (build only)
+    uv run scripts/publish.py --dispatch --publish   # same, and upload to PyPI
     uv run scripts/publish.py --dispatch --ref some-branch
 
 Required for --dispatch (or in .env.publish):
@@ -169,13 +169,13 @@ def github_token() -> str:
     return token
 
 
-def dispatch_workflow(dry_run: bool, ref: str = "master") -> None:
+def dispatch_workflow(publish: bool, ref: str = "master") -> None:
     token = github_token()
     url = (
         f"https://api.github.com/repos/{REPO}/actions/workflows"
         f"/{WORKFLOW_FILE}/dispatches"
     )
-    payload = {"ref": ref, "inputs": {"dry_run": str(dry_run).lower()}}
+    payload = {"ref": ref, "inputs": {"publish": str(publish).lower()}}
     data = json.dumps(payload).encode()
     req = urllib.request.Request(
         url,
@@ -188,7 +188,7 @@ def dispatch_workflow(dry_run: bool, ref: str = "master") -> None:
         },
         method="POST",
     )
-    print(f"Dispatching '{WORKFLOW_FILE}' on '{ref}' (dry_run={dry_run})...")
+    print(f"Dispatching '{WORKFLOW_FILE}' on '{ref}' (publish={publish})...")
     try:
         with urllib.request.urlopen(req) as resp:
             resp.read()
@@ -220,10 +220,10 @@ def main() -> None:
              "Does not bump the version.",
     )
     parser.add_argument(
-        "--dry-run",
+        "--publish",
         action="store_true",
-        help="Only valid with --dispatch. Passes dry_run=true to the workflow "
-             "(build only, skip publish).",
+        help="Only valid with --dispatch. Passes publish=true to the workflow "
+             "(build and upload to PyPI).",
     )
     parser.add_argument(
         "--ref",
@@ -233,11 +233,11 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    if args.dry_run and not args.dispatch:
-        parser.error("--dry-run requires --dispatch")
+    if args.publish and not args.dispatch:
+        parser.error("--publish requires --dispatch")
 
     if args.dispatch:
-        dispatch_workflow(dry_run=args.dry_run, ref=args.ref)
+        dispatch_workflow(publish=args.publish, ref=args.ref)
     else:
         tag_release(args.version)
 
