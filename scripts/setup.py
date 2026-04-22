@@ -3,10 +3,11 @@
 
 Steps:
     1. Install workspace dependencies via `uv sync`.
-    2. Generate a self-signed SSL certificate for local Supabase HTTPS dev
+    2. Install `dotenvx` for reading the encrypted .env files.
+    3. Generate a self-signed SSL certificate for local Supabase HTTPS dev
        (matches `[api.tls]` in supabase/config.toml).
 
-Run via `uv run scripts/setup.py` so the sync'd venv is active when step 2
+Run via `uv run scripts/setup.py` so the sync'd venv is active when step 3
 imports pyOpenSSL.
 """
 
@@ -35,8 +36,18 @@ def ensure_uv() -> None:
 
 
 def sync_dependencies() -> None:
-    print("\n[1/2] Syncing workspace dependencies...")
+    print("\n[1/3] Syncing workspace dependencies...")
     run(["uv", "sync"])
+
+
+def install_dotenvx() -> None:
+    """Add dotenvx to the project so encrypted .env values can be decrypted.
+
+    `uv add` is idempotent — if dotenvx is already pinned in pyproject.toml it
+    just reconciles the version and updates the lockfile.
+    """
+    print("\n[2/3] Installing dotenvx (encrypted .env loader)...")
+    run(["uv", "add", "dotenvx"])
 
 
 def generate_ssl_certs() -> None:
@@ -45,7 +56,7 @@ def generate_ssl_certs() -> None:
     Delegates to `scripts/generate_ssl.py`; cwd is pinned to ROOT because that
     module writes paths relative to the current working directory.
     """
-    print("\n[2/2] Generating self-signed SSL certificate for local Supabase...")
+    print("\n[3/3] Generating self-signed SSL certificate for local Supabase...")
     if str(SCRIPTS_DIR) not in sys.path:
         sys.path.insert(0, str(SCRIPTS_DIR))
     from generate_ssl import generate_ssl_cert
@@ -63,6 +74,7 @@ def generate_ssl_certs() -> None:
 def main() -> None:
     ensure_uv()
     sync_dependencies()
+    install_dotenvx()
     generate_ssl_certs()
 
     print("\nSetup complete.")

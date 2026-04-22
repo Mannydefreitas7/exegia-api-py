@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
-"""Start the local Supabase dev stack.
+"""Start the local Supabase dev stack with dotenvx-loaded env.
 
-Thin wrapper around the Supabase CLI:
-    1. Verifies `supabase` and `docker` are on PATH.
-    2. Checks whether the stack is already up (idempotent).
-    3. Runs `supabase start` from the project root.
-    4. Prints status (URLs + keys) on success.
+Every Supabase call is wrapped with `dotenvx run -f .env.development --` so
+secrets from `.env.development` (decrypted via `.env.keys` when encrypted) are
+injected into the command's environment. This keeps local dev consistent with
+how production reads env vars and avoids leaking values into the parent shell.
+
+Steps:
+    1. Verify `dotenvx`, `supabase`, and `docker` are on PATH.
+    2. Check whether the stack is already up (idempotent).
+    3. Run `supabase start` from the project root, under dotenvx.
+    4. Print status (URLs + keys) on success.
 
 Usage:
     uv run scripts/start.py          # start the local stack
@@ -21,6 +26,15 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+ENV_FILE = ".env.development"
+
+
+def dotenvx_wrap(cmd: list[str]) -> list[str]:
+    """Prepend `dotenvx run` so .env.development values are loaded into the command's env.
+
+    `.env.keys` is auto-discovered next to the env file for encrypted values.
+    """
+    return ["dotenvx", "run", "-f", ENV_FILE, "--", *cmd]
 
 
 def run(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -39,7 +53,7 @@ def ensure_tool(name: str, hint: str) -> None:
 def is_stack_running() -> bool:
     """`supabase status` exits non-zero when the stack is down."""
     result = subprocess.run(
-        ["supabase", "status"],
+        dotenvx_wrap(["supabase", "status"]),
         cwd=ROOT,
         capture_output=True,
         text=True,
@@ -48,22 +62,36 @@ def is_stack_running() -> bool:
 
 
 def start() -> None:
-    ensure_tool("supabase", "Install: https://supabase.com/docs/guides/local-development/cli/getting-started")
+    ensure_tool(
+        "dotenvx",
+        "Install: `uv add dotenvx` (already in setup.py) or https://dotenvx.com/docs/install",
+    )
+    ensure_tool(
+        "supabase",
+        "Install: https://supabase.com/docs/guides/local-development/cli/getting-started",
+    )
     ensure_tool("docker", "Install Docker Desktop and make sure it is running.")
 
     if is_stack_running():
         print("Supabase local stack is already running.\n")
-        run(["supabase", "status"])
+        run(dotenvx_wrap(["supabase", "status"]))
         return
 
     print("Starting Supabase local stack (Docker containers may take a minute)...")
-    run(["supabase", "start"])
+    run(dotenvx_wrap(["supabase", "start"]))
     print("\nSupabase local stack is up.")
 
 
 def stop() -> None:
-    ensure_tool("supabase", "Install: https://supabase.com/docs/guides/local-development/cli/getting-started")
-    run(["supabase", "stop"])
+    ensure_tool(
+        "dotenvx",
+        "Install: `uv add dotenvx` (already in setup.py) or https://dotenvx.com/docs/install",
+    )
+    ensure_tool(
+        "supabase",
+        "Install: https://supabase.com/docs/guides/local-development/cli/getting-started",
+    )
+    run(dotenvx_wrap(["supabase", "stop"]))
 
 
 def main() -> None:
