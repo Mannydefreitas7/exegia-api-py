@@ -7,6 +7,9 @@ inputs:
   pr_number:
     description: 'Pull Request Number'
     required: true
+  base_ref:
+    description: 'Base branch to push the version bump commit to'
+    required: false
 outputs:
   tag:
     description: 'The new version tag'
@@ -32,8 +35,19 @@ runs:
         git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
         git tag "$TAG"
 
-        # Determine the base branch from the environment or use a default
-        BASE_REF="${{ github.event.pull_request.base.ref }}"
+        # Determine the base branch from action input, current ref, or PR base ref
+        BASE_REF="${{ inputs.base_ref }}"
+        if [ -z "$BASE_REF" ]; then
+          BASE_REF="${GITHUB_REF_NAME}"
+        fi
+        if [ -z "$BASE_REF" ]; then
+          BASE_REF="${{ github.event.pull_request.base.ref }}"
+        fi
+        if [ -z "$BASE_REF" ]; then
+          echo "Unable to determine base branch. Set the 'base_ref' input when using this action outside pull_request events." >&2
+          exit 1
+        fi
+
         git push origin HEAD:$BASE_REF
         git push origin "$TAG"
 
