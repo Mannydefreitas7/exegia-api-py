@@ -72,8 +72,10 @@ jobs:
       Publish Python 🐍 distribution 📦 to PyPI
     # only publish to PyPI on tag pushes, OR workflow_dispatch with publish=true
     if: >-
-      (startsWith(github.ref, 'refs/tags/')) ||
-      (github.event_name == 'workflow_dispatch' && inputs.publish)
+      always() && (
+        (startsWith(github.ref, 'refs/tags/')) ||
+        (github.event_name == 'workflow_dispatch' && inputs.publish)
+      )
     needs:
       - build
     runs-on: ubuntu-latest
