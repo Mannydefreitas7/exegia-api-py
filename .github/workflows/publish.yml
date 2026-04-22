@@ -16,6 +16,10 @@ on:
         description: "If true, only build the distribution without publishing"
         required: false
         default: "false"
+      publish:
+        description: "Force the publish step to run even if the tag is not a release tag"
+        required: false
+        default: "false"
 
 # ── jobs ──────────────────────────────────────────────────────────────────────
 
@@ -72,7 +76,8 @@ jobs:
     # only publish to PyPI on tag pushes, OR workflow_dispatch with dry_run=false
     if: >-
       (startsWith(github.ref, 'refs/tags/')) ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'false')
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'false') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true')
     needs:
       - build
     runs-on: ubuntu-latest
