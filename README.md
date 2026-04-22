@@ -8,11 +8,11 @@
 
 Exegia is a backend for studying annotated religious texts (Bible, Quran, Tanakh, commentaries, lexicons). It exposes corpus data through three surfaces:
 
-| Surface | Technology | Use case |
-|---------|-----------|----------|
-| **GraphQL API** | Strawberry + FastAPI | Frontend apps, structured queries |
-| **MCP server** | FastMCP | AI assistants (Claude, GPT, etc.) |
-| **REST / Storage** | FastAPI + Supabase | Dataset management, book library |
+| Surface            | Technology           | Use case                          |
+| ------------------ | -------------------- | --------------------------------- |
+| **GraphQL API**    | Strawberry + FastAPI | Frontend apps, structured queries |
+| **MCP server**     | FastMCP              | AI assistants (Claude, GPT, etc.) |
+| **REST / Storage** | FastAPI + Supabase   | Dataset management, book library  |
 
 Corpora are loaded from [Context-Fabric](https://context-fabric.ai) — a graph-based annotated text engine. Every word, verse, chapter, and book is a typed node in a graph with queryable features (lemma, morphology, gloss, etc.).
 
@@ -51,17 +51,17 @@ Corpora are loaded from [Context-Fabric](https://context-fabric.ai) — a graph-
 
 Everything lives in the `exegia` namespace (`src/exegia/`):
 
-| Module | Purpose |
-|--------|---------|
-| `exegia.mcp` | FastMCP server — 11 corpus tools for AI clients |
-| `exegia.graphql` | Strawberry GraphQL schema over corpus data |
-| `exegia.corpus` | Fetch TF datasets from git repositories |
-| `exegia.storage` | Supabase Storage client + dataset service |
-| `exegia.models` | SQLAlchemy ORM models for the book library |
-| `exegia.schemas` | Pydantic request/response schemas |
-| `exegia.auth` | JWT + Supabase Auth utilities |
-| `exegia.utils` | EPUB / HTML → Text-Fabric converters |
-| `exegia.supabase` | Bundled migrations, config, and asset helpers |
+| Module            | Purpose                                         |
+| ----------------- | ----------------------------------------------- |
+| `exegia.mcp`      | FastMCP server — 11 corpus tools for AI clients |
+| `exegia.graphql`  | Strawberry GraphQL schema over corpus data      |
+| `exegia.corpus`   | Fetch TF datasets from git repositories         |
+| `exegia.storage`  | Supabase Storage client + dataset service       |
+| `exegia.models`   | SQLAlchemy ORM models for the book library      |
+| `exegia.schemas`  | Pydantic request/response schemas               |
+| `exegia.auth`     | JWT + Supabase Auth utilities                   |
+| `exegia.utils`    | EPUB / HTML → Text-Fabric converters            |
+| `exegia.supabase` | Bundled migrations, config, and asset helpers   |
 
 ---
 
@@ -123,17 +123,18 @@ query {
   passage(corpus: "BHSA", reference: "Genesis 1:1-3") {
     reference
     text
-    words { text lemma partOfSpeech gloss }
+    words {
+      text
+      lemma
+      partOfSpeech
+      gloss
+    }
   }
 }
 
 # Morphological word search
 query {
-  words(
-    corpus: "BHSA"
-    filter: { book: "Genesis", partOfSpeech: "verb", verbTense: "perfect" }
-    limit: 50
-  ) {
+  words(corpus: "BHSA", filter: { book: "Genesis", partOfSpeech: "verb", verbTense: "perfect" }, limit: 50) {
     text
     lemma
     gloss
@@ -151,14 +152,14 @@ query {
 
 ### GraphQL types
 
-| Type | Key fields |
-|------|-----------|
-| `Corpus` | `name`, `nodeTypes`, `featureCount`, `books` |
-| `Book` | `name`, `chapters` |
-| `Chapter` | `reference`, `verses` |
-| `Verse` | `reference`, `text`, `words` |
-| `Word` | `text`, `lemma`, `partOfSpeech`, `gloss`, `gender`, `number`, `person`, `verbStem`, `verbTense`, `feature(name)` |
-| `SearchMatch` | `reference`, `text` |
+| Type          | Key fields                                                                                                       |
+| ------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `Corpus`      | `name`, `nodeTypes`, `featureCount`, `books`                                                                     |
+| `Book`        | `name`, `chapters`                                                                                               |
+| `Chapter`     | `reference`, `verses`                                                                                            |
+| `Verse`       | `reference`, `text`, `words`                                                                                     |
+| `Word`        | `text`, `lemma`, `partOfSpeech`, `gloss`, `gender`, `number`, `person`, `verbStem`, `verbTense`, `feature(name)` |
+| `SearchMatch` | `reference`, `text`                                                                                              |
 
 Field names use natural language (`lemma`, `partOfSpeech`) instead of raw corpus shorthand (`lex`, `sp`). Use the `feature(name)` escape hatch to access any raw feature directly.
 
@@ -183,39 +184,21 @@ uv run cf-mcp \
   --corpus ~/.exegia/datasets/bibles/GNT  --name GNT
 ```
 
-### Claude Desktop config
-
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "exegia": {
-      "command": "uv",
-      "args": [
-        "run", "--project", "/path/to/backend",
-        "cf-mcp", "--corpus", "/path/to/corpus"
-      ]
-    }
-  }
-}
-```
-
 ### Available tools (11)
 
-| Category | Tool | Description |
-|----------|------|-------------|
-| Discovery | `list_corpora` | List loaded corpora and the active one |
-| Discovery | `describe_corpus` | Node types with counts, section hierarchy |
-| Discovery | `list_features` | Browse features, filter by node type |
-| Discovery | `describe_feature` | Metadata + top values by frequency |
-| Discovery | `get_text_formats` | Available text encodings with samples |
-| Search | `search` | Pattern search — results / count / statistics / passages |
-| Search | `search_continue` | Paginate large result sets via cursor |
-| Search | `search_csv` | Export results to a local CSV file |
-| Search | `search_syntax_guide` | Inline query syntax documentation |
-| Data | `get_passages` | Retrieve text by section reference |
-| Data | `get_node_features` | Batch feature lookup for a list of nodes |
+| Category  | Tool                  | Description                                              |
+| --------- | --------------------- | -------------------------------------------------------- |
+| Discovery | `list_corpora`        | List loaded corpora and the active one                   |
+| Discovery | `describe_corpus`     | Node types with counts, section hierarchy                |
+| Discovery | `list_features`       | Browse features, filter by node type                     |
+| Discovery | `describe_feature`    | Metadata + top values by frequency                       |
+| Discovery | `get_text_formats`    | Available text encodings with samples                    |
+| Search    | `search`              | Pattern search — results / count / statistics / passages |
+| Search    | `search_continue`     | Paginate large result sets via cursor                    |
+| Search    | `search_csv`          | Export results to a local CSV file                       |
+| Search    | `search_syntax_guide` | Inline query syntax documentation                        |
+| Data      | `get_passages`        | Retrieve text by section reference                       |
+| Data      | `get_node_features`   | Batch feature lookup for a list of nodes                 |
 
 ### Recommended workflow for AI agents
 
@@ -265,12 +248,12 @@ paths = fetch_datasets_from_git("https://github.com/ETCBC/bhsa")
 
 ### Storage buckets
 
-| Bucket | Content |
-|--------|---------|
-| `bibles` | Bible translations and critical texts (BHSA, GNT, LXX, …) |
-| `lexicons` | Lexical databases |
-| `dictionaries` | Language dictionaries |
-| `books` | Other annotated books and commentaries |
+| Bucket         | Content                                                   |
+| -------------- | --------------------------------------------------------- |
+| `bibles`       | Bible translations and critical texts (BHSA, GNT, LXX, …) |
+| `lexicons`     | Lexical databases                                         |
+| `dictionaries` | Language dictionaries                                     |
+| `books`        | Other annotated books and commentaries                    |
 
 ---
 
@@ -333,11 +316,11 @@ library_books
        └─ book_pages (smallest addressable unit: verse, page, entry, …)
 ```
 
-| Table | Purpose |
-|-------|---------|
-| `LibraryBook` | Catalog entry: title, author, category, source type |
-| `BookSection` | Hierarchy node with `level` and `parent_uuid` |
-| `BookPage` | Content unit; `section_uuid` is nullable for flat books |
+| Table         | Purpose                                                 |
+| ------------- | ------------------------------------------------------- |
+| `LibraryBook` | Catalog entry: title, author, category, source type     |
+| `BookSection` | Hierarchy node with `level` and `parent_uuid`           |
+| `BookPage`    | Content unit; `section_uuid` is nullable for flat books |
 
 **Flat book:** `LibraryBook → BookPage(s)` (no sections)
 
