@@ -1,3 +1,3 @@
 """Exegia — graph-based biblical and religious text study platform."""
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
