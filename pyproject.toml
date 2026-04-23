@@ -1,6 +1,6 @@
 [project]
 name = "py-exegia"
-version = "0.1.7"
+version = "0.1.8"
 description = "Graph-based biblical and religious text study platform"
 readme = "README.md"
 license = { text = "Proprietary" }
