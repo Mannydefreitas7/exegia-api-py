@@ -10,7 +10,7 @@ from OpenSSL import crypto
 
 logger = logging.getLogger(__name__)
 
-CERT_DIR = Path("supabase")
+CERT_DIR = Path("src/exegia/supabase")
 CERT_FILE = CERT_DIR / "cert.pem"
 KEY_FILE = CERT_DIR / "key.pem"
 
@@ -45,7 +45,9 @@ def generate_ssl_cert() -> tuple[Path, Path]:
     # SAN extension so browsers/clients accept the cert for localhost
     cert.add_extensions(
         [
-            crypto.X509Extension(b"subjectAltName", False, b"DNS:localhost,IP:127.0.0.1"),
+            crypto.X509Extension(
+                b"subjectAltName", False, b"DNS:localhost,IP:127.0.0.1"
+            ),
             crypto.X509Extension(b"basicConstraints", True, b"CA:TRUE"),
         ]
     )

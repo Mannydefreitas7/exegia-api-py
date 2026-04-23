@@ -33,6 +33,19 @@ def remove(path: Path) -> None:
         print(f"  removed  {path.relative_to(ROOT)}")
 
 
+def stop_supabase() -> None:
+    result = subprocess.run(
+        ["supabase", "stop"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        print("  supabase stop")
+    else:
+        print(f"  supabase stop failed:\n{result.stderr.strip()}", file=sys.stderr)
+
+
 def docker_down() -> None:
     result = subprocess.run(
         ["docker", "compose", "down", "--remove-orphans"],
@@ -43,14 +56,16 @@ def docker_down() -> None:
     if result.returncode == 0:
         print("  docker compose down")
     else:
-        print(f"  docker compose down failed:\n{result.stderr.strip()}", file=sys.stderr)
+        print(
+            f"  docker compose down failed:\n{result.stderr.strip()}", file=sys.stderr
+        )
 
 
 def main() -> None:
     print("Cleaning project...\n")
 
-    print("Stopping Docker services...")
-    docker_down()
+    print("  stopping supabase...")
+    stop_supabase()
 
     print("\nRemoving top-level directories...")
     for name in DIRS_TO_REMOVE:
