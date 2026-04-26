@@ -1,0 +1,17 @@
+{
+	# Global options
+	local_certs
+}
+
+api.exegia.local, exegia.localhost {
+	reverse_proxy app:8000
+
+	handle_errors {
+		rewrite * /{err.status_code}.html
+		file_server
+	}
+
+	log {
+		output file /var/log/caddy/access.log
+	}
+}
