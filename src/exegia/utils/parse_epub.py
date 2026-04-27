@@ -1,9 +1,8 @@
-cd .."""
+"""
 EPUB service — opens a local or remote EPUB file, extracts metadata and page
 content, and tracks extraction progress via a simple callback.
 """
 import re
-import tempfile
 import urllib.request
 from typing import Any, Callable
 from urllib.parse import urlparse
@@ -99,10 +98,19 @@ def _clean_html(html_bytes: bytes) -> str:
 
 def _html_to_text(html_bytes: bytes) -> str:
     soup = BeautifulSoup(html_bytes, "html.parser")
-    return soup.get_text(separator=" ", strip=True)
+    return soup.get_text(strip=True)
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
+
+
+def _load_book(path: str) -> epub.EpubBook:
+    """Load an EPUB from a local path or a remote URL."""
+    parsed = urlparse(path)
+    if parsed.scheme in ("http", "https"):
+        tmp_name, _ = urllib.request.urlretrieve(path)
+        return epub.read_epub(tmp_name)
+    return epub.read_epub(path)
 
 
 def get_metadata(path: str) -> dict[str, Any]:
