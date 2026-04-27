@@ -19,7 +19,7 @@ from app.config import Settings, get_settings
 
 
 def _make_client(url: str, key: str) -> Client:
-    """Create a stateless Supabase client (no session persistence on the server)."""
+    """Create a stateless supabase client (no session persistence on the server)."""
     if not key:
         raise RuntimeError(
             "Supabase key is missing. Set SUPABASE_ANON_KEY / "

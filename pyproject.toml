@@ -16,10 +16,10 @@ classifiers = [
 ]
 dependencies = [
     # Web framework
-    "fastapi[standard]>=0.115.0",
-    "uvicorn[standard]>=0.30.0",
+    "fastapi[standard]==0.136.1",
+    "uvicorn[standard]==0.46.0",
     # GraphQL
-    "strawberry-graphql[fastapi]>=0.314.0",
+    "strawberry-graphql[fastapi]==0.315.2",
     # MCP server
     "fastmcp>=2.0",
     # Corpus
@@ -35,12 +35,14 @@ dependencies = [
     # Auth
     "python-jose[cryptography]>=3.3.0",
     "passlib[bcrypt]>=1.7.4",
-    "pyOpenSSL>=23.0.0",
+    "pyopenssl==26.1.0",
     # Utilities
     "python-multipart>=0.0.9",
     "ebooklib>=0.18",
     "beautifulsoup4>=4.12.0",
     "lxml>=5.0.0",
+    "supabase==2.29.0",
+    "ruff>=0.15.12",
 ]
 
 [project.scripts]

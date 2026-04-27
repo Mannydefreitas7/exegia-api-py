@@ -48,6 +48,5 @@ src/exegia/supabase/*.pem
 
 # dotenvx
 .env.keys
-.env.local
 .env.*.local
 src/exegia/supabase/seeds/*_rows.sql
