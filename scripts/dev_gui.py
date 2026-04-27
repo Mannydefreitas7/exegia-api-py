@@ -175,10 +175,16 @@ def _build_list_tab() -> None:
             table.rows = rows
             status_lbl.text = f"{len(rows)} corpus(es) returned"
         elif code == 0:
-            ui.notify(str(data), type="warning")
+            try:
+                ui.notify(str(data), type="warning")
+            except RuntimeError:
+                pass
             status_lbl.text = str(data)
         else:
-            ui.notify(f"Error {code}: {data}", type="negative")
+            try:
+                ui.notify(f"Error {code}: {data}", type="negative")
+            except RuntimeError:
+                pass
             status_lbl.text = f"Error {code}"
 
     refresh_btn.on("click", lambda: asyncio.ensure_future(refresh()))
