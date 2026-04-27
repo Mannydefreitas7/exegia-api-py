@@ -3,9 +3,10 @@ services:
     build: .
     restart: unless-stopped
     env_file:
-      - .env.development
-    environment:
-      - DOTENV_PUBLIC_KEY_DEVELOPMENT
+      - path: .env.development
+        required: true
+      - path: .env.keys
+        required: true
     extra_hosts:
       - "host.docker.internal:host-gateway"
     # The app runs on 8000 inside the container
@@ -16,14 +17,15 @@ services:
     build: .
     restart: unless-stopped
     env_file:
-      - .env.development
-    environment:
-      - DOTENV_PUBLIC_KEY_DEVELOPMENT
+      - path: .env.development
+        required: true
+      - path: .env.keys
+        required: true
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
       - "8080:8080"
-    command: [ "python", "scripts/dev_gui.py", "--base-url", "https://app:8000" ]
+    command: [ "python", "scripts/dev_gui.py", "--base-url", "http://app:8000" ]
     depends_on:
       - app
 

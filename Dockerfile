@@ -28,10 +28,13 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # ── Stage 2: runtime ────────────────────────────────────────────────────────
 FROM python:3.13-slim-bookworm AS runtime
 
-# Install dotenvx binary (not available as a pip package — it's a standalone CLI).
+# Install dotenvx binary and supabase cli (standalone CLIs).
 RUN apt-get update -qq && \
     apt-get install -y --no-install-recommends curl ca-certificates && \
     curl -sfS https://dotenvx.sh/install.sh | DOTENVX_INSTALL_DIR=/usr/local/bin sh && \
+    ARCH=$(dpkg --print-architecture) && \
+    if [ "$ARCH" = "amd64" ]; then SU_ARCH="amd64"; elif [ "$ARCH" = "arm64" ]; then SU_ARCH="arm64"; else echo "Unsupported architecture" && exit 1; fi && \
+    curl -sfL "https://github.com/supabase/cli/releases/latest/download/supabase_linux_${SU_ARCH}.tar.gz" | tar -xz -C /usr/local/bin supabase && \
     apt-get purge -y --auto-remove curl && \
     rm -rf /var/lib/apt/lists/*
 
