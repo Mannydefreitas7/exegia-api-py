@@ -19,7 +19,7 @@ from postgrest.exceptions import APIError
 from supabase import Client
 
 from app.config import Settings, get_settings
-from app.schemas import ConvertCorpusResponse, Corpus, CorpusMetadata
+from exegia.schemas import ConvertCorpusResponse, Corpus, CorpusMetadata
 from app.supabase_client import get_anon_client, get_service_client
 
 logger = logging.getLogger(__name__)
@@ -143,9 +143,7 @@ async def convert_corpus(
         # Running the sync call in a worker thread avoids that bug entirely
         # and is just as performant for the small forwarded payload.
         with httpx.Client(timeout=EDGE_FUNCTION_TIMEOUT_S) as client:
-            return client.post(
-                function_url, headers=headers, data=data, files=files
-            )
+            return client.post(function_url, headers=headers, data=data, files=files)
 
     try:
         response = await asyncio.to_thread(_post_sync)

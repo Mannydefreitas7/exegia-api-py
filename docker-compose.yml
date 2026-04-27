@@ -10,6 +10,19 @@ services:
     expose:
       - "8000"
 
+  dev-gui:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env.development
+    environment:
+      - DOTENV_PUBLIC_KEY_DEVELOPMENT
+    ports:
+      - "8080:8080"
+    command: [ "python", "scripts/dev_gui.py", "--base-url", "https://app:8000" ]
+    depends_on:
+      - app
+
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped

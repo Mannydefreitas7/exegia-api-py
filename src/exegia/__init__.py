@@ -46,6 +46,8 @@ def _load_corpora_from_env() -> None:
 
 
 def create_app() -> FastAPI:
+    from exegia.routers.corpora import router as corpora_router  # noqa: PLC0415
+
     _load_corpora_from_env()
 
     app = FastAPI(
@@ -72,6 +74,8 @@ def create_app() -> FastAPI:
     @app.get("/health", tags=["meta"])
     def health() -> dict[str, object]:
         return {"status": "ok", "corpora": registry.names()}
+
+    app.include_router(corpora_router)
 
     graphql_path = os.getenv("EXEGIA_GRAPHQL_PATH", "/graphql")
     app.include_router(GraphQLRouter(schema), prefix=graphql_path)

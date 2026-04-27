@@ -16,15 +16,24 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 # Now copy the source and install the project (no-op for non-package layouts,
 # but keeps the workflow consistent if pyproject is later promoted).
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml uv.lock README.md ./
 COPY main.py ./
+COPY app ./app
 COPY src ./src
+COPY scripts ./scripts
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
 
 # ── Stage 2: runtime ────────────────────────────────────────────────────────
 FROM python:3.13-slim-bookworm AS runtime
+
+# Install dotenvx binary (not available as a pip package — it's a standalone CLI).
+RUN apt-get update -qq && \
+    apt-get install -y --no-install-recommends curl ca-certificates && \
+    curl -sfS https://dotenvx.sh/install.sh | DOTENVX_INSTALL_DIR=/usr/local/bin sh && \
+    apt-get purge -y --auto-remove curl && \
+    rm -rf /var/lib/apt/lists/*
 
 # Drop privileges — never run as root in containers.
 RUN groupadd --system app && useradd --system --gid app --create-home app
@@ -41,7 +50,7 @@ ENV PATH="/app/.venv/bin:${PATH}" \
 
 USER app
 
-EXPOSE 8000
+EXPOSE 8000 8080
 
 # Healthcheck hits FastAPI's /health route (defined in main.py).
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
