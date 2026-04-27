@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:nicegui.io)",
+      "Bash(uv sync *)",
+      "Bash(uv run *)",
+      "Bash(echo \"PID=$!\")",
+      "Bash(curl -s --max-time 5 http://localhost:8000/health)",
+      "Bash(ps -p 29870 -o command=)",
+      "Bash(curl -sv --max-time 3 http://localhost:8000/api/corpora)",
+      "Bash(kill 37520)",
+      "Bash(echo \"API PID=$!\")",
+      "Bash(curl -s --max-time 5 http://127.0.0.1:8001/health)",
+      "Bash(echo \"GUI PID=$!\")",
+      "Bash(curl -s --max-time 5 http://127.0.0.1:8001/api/corpora)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f'{len\\(d\\)} corpora returned'\\)\")",
+      "Bash(curl -s 'http://127.0.0.1:8001/api/corpora?limit=5')",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f'  {d}'\\)\")",
+      "Bash(curl -s --max-time 3 http://localhost:8080/)",
+      "Bash(curl -s http://127.0.0.1:8001/api/corpora?limit=5)",
+      "Bash(curl -s http://127.0.0.1:8001/api/corpora/bhsa)",
+      "Bash(curl -s 'http://127.0.0.1:8001/api/corpora/bhsa')",
+      "Bash(curl -s 'http://127.0.0.1:8001/openapi.json')",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(p\\) for p in d.get\\('paths',{}\\).keys\\(\\)]\")",
+      "Bash(kill 37646)",
+      "Bash(curl -s 'http://127.0.0.1:8001/api/corpora')",
+      "Bash(python3 -c ' *)",
+      "Bash(curl -s 'http://127.0.0.1:8001/api/corpora?language=hbo')",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f'  hbo filter: {len\\(d\\)} row\\(s\\)'\\)\")",
+      "Bash(curl -sv 'http://127.0.0.1:8001/api/corpora')",
+      "Bash(kill 37670 37863)"
+    ]
+  }
+}
