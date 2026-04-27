@@ -1,10 +1,9 @@
 """Pydantic-settings configuration for the Exegia API server."""
 
 from __future__ import annotations
-
+import os
 from functools import lru_cache
 
-from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,23 +14,28 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    supabase_url: str = Field(default="", alias="SUPABASE_URL")
-    supabase_anon_key: str = Field(default="", alias="SUPABASE_ANON_KEY")
-    supabase_service_role_key: str = Field(
-        default="", alias="SUPABASE_SERVICE_ROLE_KEY"
-    )
-    supabase_storage_bucket: str = Field(
-        default="corpora", alias="SUPABASE_STORAGE_BUCKET"
-    )
-    database_url: str = Field(default="", alias="DATABASE_URL")
+    supabase_project_ref: str = os.getenv("SUPABASE_PROJECT_REF", "")
+    supabase_url: str = os.getenv("SUPABASE_URL", "")
+    supabase_publishable_key: str = os.getenv("SUPABASE_PUBLISHABLE_KEY", "")
+    supabase_service_role_key: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    supabase_storage_bucket: str = os.getenv("SUPABASE_STORAGE_BUCKET", "corpora")
+    supabase_secret_key: str = os.getenv("SUPABASE_SECRET_KEY", "")
+
+    database_url: str = os.getenv("DATABASE_URL", "")
+
+    datasets_base_path: str = os.getenv("DATASETS_BASE_PATH", "")
 
     # Name of the Supabase Edge Function that converts corpus archives.
-    convert_corpus_function: str = Field(
-        default="convert-corpus", alias="CONVERT_CORPUS_FUNCTION"
-    )
+    convert_corpus_function: str = os.getenv("CONVERT_CORPUS_FUNCTION", "convert-corpus")
 
-    environment: str = Field(default="development", alias="ENVIRONMENT")
-    cors_origins: str = Field(default="*", alias="CORS_ORIGINS")
+    environment: str = os.getenv("ENVIRONMENT", "")
+    cors_origins: str = os.getenv("CORS_ORIGINS", "*")
+
+    open_ai_key: str = os.getenv("OPEN_AI_KEY", "")
+
+    uv_index_exegia_url: str = os.getenv("UV_INDEX_EXEGIA_URL", "")
+    exegia_pypi_publish_url: str = os.getenv("EXEGIA_PYPI_PUBLISH_URL", "")
+    github_token: str = os.getenv("GITHUB_TOKEN", "")
 
 
 @lru_cache(maxsize=1)

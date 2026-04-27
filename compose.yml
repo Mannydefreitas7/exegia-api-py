@@ -6,6 +6,8 @@ services:
       - .env.development
     environment:
       - DOTENV_PUBLIC_KEY_DEVELOPMENT
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     # The app runs on 8000 inside the container
     expose:
       - "8000"
@@ -17,6 +19,8 @@ services:
       - .env.development
     environment:
       - DOTENV_PUBLIC_KEY_DEVELOPMENT
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8080:8080"
     command: [ "python", "scripts/dev_gui.py", "--base-url", "https://app:8000" ]
