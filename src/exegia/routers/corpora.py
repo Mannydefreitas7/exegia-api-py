@@ -20,7 +20,7 @@ from supabase import Client
 
 from app.config import Settings, get_settings
 from exegia.schemas import ConvertCorpusResponse, Corpus, CorpusMetadata
-from app.supabase_client import get_anon_client, get_service_client
+from exegia.utils.connect import get_anon_client, get_service_client
 
 logger = logging.getLogger(__name__)
 
