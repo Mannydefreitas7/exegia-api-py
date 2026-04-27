@@ -14,9 +14,10 @@
 //   5. Remove the original from <bucket>/uploads/{job_id}.zip
 //   6. Insert a row into public.corpora
 
-import dotenvx from "npm:@dotenvx/dotenvx@^1.63.0";
-import { createClient } from "npm:@supabase/supabase-js@2";
-import JSZip from "npm:jszip@3.10.1";
+import dotenvx from "@dotenvx/dotenvx";
+import { createClient } from "@supabase/supabase-js";
+import JSZip from "jszip";
+import type {CorpusMetadata, ProcessArgs} from "./type.ts";
 
 declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void };
 
@@ -36,7 +37,7 @@ const EXTENSION_TO_FORMAT: Record<string, string> = {
 };
 
 addEventListener("beforeunload", (ev) => {
-  console.log("convert-corpus shutting down:", ev.detail?.reason);
+  console.log("convert-corpus shutting down:", ev.type);
 });
 
 addEventListener("unhandledrejection", (ev) => {

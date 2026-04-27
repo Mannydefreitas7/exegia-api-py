@@ -1,3 +1,5 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 interface ProcessArgs {
   jobId: string;
   tmpPath: string;
@@ -18,4 +20,4 @@ interface CorpusMetadata {
   credits?: string;
 }
 
-export { CorpusMetadata, ProcessArgs };
+export type { CorpusMetadata, ProcessArgs };
