@@ -14,13 +14,15 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     uv sync --frozen --no-install-project --no-dev
 
-# Now copy the source and install the project (no-op for non-package layouts,
-# but keeps the workflow consistent if pyproject is later promoted).
+# Now copy the source and install the project (editable by default in uv,
+# which lets bind-mounted source in compose hot-reload through the venv).
 COPY pyproject.toml uv.lock README.md ./
 COPY main.py ./
-COPY app ./app
 COPY src ./src
 COPY scripts ./scripts
+# Encrypted env file — safe to bake in, values are AES-encrypted and only
+# decryptable with DOTENV_PRIVATE_KEY_* (provided at runtime via env).
+COPY .env.development ./
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
@@ -55,9 +57,12 @@ USER app
 
 EXPOSE 8000 8080
 
-# Healthcheck hits FastAPI's /health route (defined in main.py).
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+# Healthcheck hits FastAPI's /health route (defined in src/exegia/__init__.py).
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD python -c "import urllib.request,sys; \
         sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).status==200 else 1)"
 
-CMD ["dotenvx", "run", "--", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Decrypt .env.development at runtime. The DOTENV_PRIVATE_KEY_DEVELOPMENT (or
+# the generic DOTENV_PRIVATE_KEY) must be supplied via the process env — see
+# compose.yml. The encrypted file itself ships in the image at /app/.env.development.
+CMD ["dotenvx", "run", "-f", ".env.development", "--", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

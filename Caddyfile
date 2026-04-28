@@ -3,6 +3,7 @@
 	local_certs
 }
 
+# FastAPI backend (REST + GraphQL + Swagger)
 api.exegia.local, exegia.localhost {
 	reverse_proxy app:8000
 
@@ -13,5 +14,22 @@ api.exegia.local, exegia.localhost {
 
 	log {
 		output file /var/log/caddy/access.log
+	}
+}
+
+# NiceGUI dev harness (live-reload + WebSocket).
+# NiceGUI uses Socket.IO; reverse_proxy auto-upgrades WebSocket connections,
+# but we explicitly preserve Host/Upgrade headers for clarity and to keep
+# NiceGUI's URL generation correct behind the proxy.
+dev.exegia.local {
+	reverse_proxy dev-gui:8080 {
+		header_up Host {host}
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+
+	log {
+		output file /var/log/caddy/dev-gui.access.log
 	}
 }

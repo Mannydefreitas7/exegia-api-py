@@ -1,33 +1,62 @@
+# Development compose file for the Exegia backend.
+#
+# How env decryption works here:
+#   * The encrypted .env.development file is baked into the image.
+#   * The decryption key comes from your *host* shell via DOTENV_PRIVATE_KEY_DEVELOPMENT
+#     (or DOTENV_PRIVATE_KEY) — typically loaded from .env.keys on the host.
+#   * The container's CMD runs `dotenvx run -f .env.development -- …` which uses
+#     that env var to decrypt values into the process environment at startup.
+#
+# Quick start:
+#   set -a && . ./.env.keys && set +a   # export keys into the shell
+#   docker compose up --build
+
 services:
   app:
     build: .
     restart: unless-stopped
-    env_file:
-      - path: .env.development
-        required: true
-      - path: .env.keys
-        required: true
+    environment:
+      DOTENV_PRIVATE_KEY_DEVELOPMENT: ${DOTENV_PRIVATE_KEY_DEVELOPMENT:?set DOTENV_PRIVATE_KEY_DEVELOPMENT in your shell or .env.keys}
+      DOTENV_PRIVATE_KEY: ${DOTENV_PRIVATE_KEY:-}
+    # Bind-mount source for hot-reload during development. The venv lives at
+    # /app/.venv inside the image and is intentionally NOT shadowed.
+    volumes:
+      - ./main.py:/app/main.py:ro
+      - ./src:/app/src:ro
+      - ./scripts:/app/scripts:ro
+      - ./.env.development:/app/.env.development:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    # The app runs on 8000 inside the container
-    expose:
-      - "8000"
+    # Expose FastAPI on the host so you can hit http://localhost:8000/docs
+    ports:
+      - "8000:8000"
+    # Override the image CMD to enable uvicorn auto-reload in dev.
+    command: >
+      dotenvx run -f .env.development --
+      uvicorn main:app
+      --host 0.0.0.0
+      --port 8000
+      --reload
+      --reload-dir /app/src
 
   dev-gui:
     build: .
     restart: unless-stopped
-    env_file:
-      - path: .env.development
-        required: true
-      - path: .env.keys
-        required: true
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    environment:
+      DOTENV_PRIVATE_KEY_DEVELOPMENT: ${DOTENV_PRIVATE_KEY_DEVELOPMENT:?set DOTENV_PRIVATE_KEY_DEVELOPMENT in your shell or .env.keys}
+      DOTENV_PRIVATE_KEY: ${DOTENV_PRIVATE_KEY:-}
+    volumes:
+      - ./scripts:/app/scripts:ro
+      - ./.env.development:/app/.env.development:ro
     ports:
       - "8080:8080"
-    command: [ "python", "scripts/dev_gui.py", "--base-url", "http://app:8000" ]
+    # Use the python from the image's venv (uv is not present in the runtime stage).
+    command: >
+      dotenvx run -f .env.development --
+      python scripts/dev_gui.py --base-url http://app:8000
     depends_on:
-      - app
+      app:
+        condition: service_healthy
 
   caddy:
     image: caddy:2-alpine
@@ -41,7 +70,8 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
-      - app
+      app:
+        condition: service_healthy
 
 volumes:
   caddy_data:

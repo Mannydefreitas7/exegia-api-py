@@ -6,14 +6,17 @@
 
 ## What is this?
 
-Exegia is a backend for studying annotated religious texts (Bible, Quran, Tanakh, commentaries, lexicons). It exposes corpus data through two surfaces:
+Exegia is a backend for studying annotated religious texts (Bible, Quran, Tanakh, commentaries, lexicons). It exposes corpus data through three surfaces:
 
-| Surface         | Technology           | Use case                          |
-| --------------- | -------------------- | --------------------------------- |
-| **GraphQL API** | Strawberry + FastAPI | Frontend apps, structured queries |
-| **MCP server**  | FastMCP              | AI assistants (Claude, GPT, etc.) |
+| Surface         | Technology           | Use case                                     |
+| --------------- | -------------------- | -------------------------------------------- |
+| **REST API**    | FastAPI              | Health, corpora upload/list, generic clients |
+| **GraphQL API** | Strawberry + FastAPI | Frontend apps, structured queries            |
+| **MCP server**  | FastMCP              | AI assistants (Claude, GPT, etc.)            |
 
 Corpora are loaded from [Context-Fabric](https://context-fabric.ai) — a graph-based annotated text engine. Every word, verse, chapter, and book is a typed node in a graph with queryable features (lemma, morphology, gloss, etc.).
+
+Persistent storage and auth are delegated to a **hosted Supabase project** (configured via `SUPABASE_URL` in `.env.development`). There is no local Supabase stack.
 
 ---
 
@@ -29,18 +32,31 @@ Corpora are loaded from [Context-Fabric](https://context-fabric.ai) — a graph-
          │                    │                   │
 ┌────────▼────────────────────▼───────────────────▼───────────┐
 │                       exegia package                        │
-│    .graphql   │   .mcp   │   .corpus   │   .utils          │
+│    .graphql   │   .mcp   │   .corpus   │   .utils           │
 └───────────────────────────┬─────────────────────────────────┘
                             │
            ┌────────────────▼────────────────┐
-           │      Context-Fabric (cfabric)    │
+           │      Context-Fabric (cfabric)   │
            │   F · E · L · T · S · N · C     │
            └────────────────┬────────────────┘
                             │
            ┌────────────────▼────────────────┐
-           │         corpus datasets          │
-           │   ~/.exegia/datasets/...         │
+           │         corpus datasets         │
+           │   ~/.exegia/datasets/...        │
            └─────────────────────────────────┘
+```
+
+The dev runtime is containerised:
+
+```
+┌─────────────────────────── docker compose ──────────────────────────┐
+│                                                                     │
+│   caddy ─► app (FastAPI / GraphQL / MCP, uvicorn --reload)          │
+│              ▲                                                      │
+│              │                                                      │
+│         dev-gui (NiceGUI test harness, scripts/dev_gui.py)          │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -68,6 +84,9 @@ Everything lives in the `exegia` namespace (`src/exegia/`):
 - **Strawberry GraphQL** — schema-first GraphQL with full type safety
 - **FastMCP 2** — MCP server for AI clients
 - **Context-Fabric** (`cfabric`) — graph corpus engine (fork of Text-Fabric)
+- **Supabase (hosted)** — auth + storage, accessed via the `supabase` Python client
+- **Docker Compose + Caddy** — local dev runtime
+- **dotenvx** — encrypted env files (`.env.development` + `.env.keys`)
 
 ---
 
@@ -77,6 +96,8 @@ Everything lives in the `exegia` namespace (`src/exegia/`):
 
 - [uv](https://docs.astral.sh/uv/) ≥ 0.9
 - Python 3.13
+- Docker Desktop (or any Docker engine) with the `docker compose` V2 plugin
+- `.env.keys` from your team's secret store — required to decrypt `.env.development`
 
 ### Install
 
@@ -86,18 +107,91 @@ cd backend
 uv run scripts/setup.py
 ```
 
+`setup.py` runs `uv sync` (installs all deps, including the `dotenvx` Python wrapper).
+
 ### Environment
 
+The repo ships with two env files at the project root:
+
+| File               | Tracked in git? | Contents                                                           |
+| ------------------ | --------------- | ------------------------------------------------------------------ |
+| `.env.example`     | ✅              | Plain placeholders, copy-as-reference                              |
+| `.env.development` | ✅              | dotenvx-**encrypted** values (safe to commit)                      |
+| `.env.keys`        | ❌ (gitignored) | dotenvx **private** decryption keys — get from your secret manager |
+
+You don't need to copy `.env.example` to `.env`. The dev workflow always reads `.env.development` (encrypted) using a key from `.env.keys`.
+
+To rotate or add a value:
+
 ```bash
-cp .env.example .env
-# fill in any required environment variables
+# Encrypt a new value into .env.development
+uv run dotenvx set MY_NEW_VAR "secret-value" -f .env.development
+
+# Decrypt locally for inspection (does NOT mutate the file)
+uv run dotenvx get MY_NEW_VAR -f .env.development
 ```
 
-### Run the API
+### Run the dev stack (Docker Compose)
+
+The recommended path for day-to-day development. Brings up the FastAPI app (with `--reload`), the optional NiceGUI test harness, and Caddy as a local TLS reverse proxy.
 
 ```bash
-uv run uvicorn main:app --reload
+uv run scripts/start.py             # build + start (detached)
+uv run scripts/start.py --logs      # build + start, then follow logs
+uv run scripts/start.py --no-build  # skip rebuild, start cached image
+uv run scripts/start.py --restart   # down + up
+uv run scripts/start.py --stop      # equivalent to scripts/stop.py
 ```
+
+`start.py`:
+
+1. Verifies `docker` + `docker compose` are available and the daemon is reachable.
+2. Reads `.env.keys` and feeds `DOTENV_PRIVATE_KEY_DEVELOPMENT` into the Compose process env so `${VAR:?…}` substitution succeeds.
+3. Runs `docker compose up [--build] -d`.
+4. Inside each container, the entrypoint is `dotenvx run -f .env.development -- …`, which decrypts the env file at startup using the private key.
+
+Once up:
+
+| URL                              | What                          |
+| -------------------------------- | ----------------------------- |
+| http://localhost:8000            | FastAPI root                  |
+| http://localhost:8000/health     | Health probe                  |
+| http://localhost:8000/docs       | Swagger UI                    |
+| http://localhost:8000/graphql    | GraphQL endpoint + GraphiQL   |
+| http://localhost:8080            | NiceGUI dev harness (dev-gui) |
+| https://api.exegia.local         | Caddy reverse-proxied (TLS)   |
+
+To stop:
+
+```bash
+uv run scripts/stop.py              # docker compose down
+uv run scripts/stop.py --volumes    # also drop named volumes (caddy_data, caddy_config)
+uv run scripts/stop.py --kill-uvicorn  # legacy: kill any host uvicorn too
+```
+
+### Run the API directly (no Docker)
+
+Useful for fast Python-only iteration without rebuilding images:
+
+```bash
+uv run dotenvx run -f .env.development -- uvicorn main:app --reload
+```
+
+This requires `.env.keys` to be present so `dotenvx` can decrypt values into the process env.
+
+---
+
+## REST API (FastAPI)
+
+The HTTP surface is mounted at the FastAPI root.
+
+| Endpoint   | Description                       |
+| ---------- | --------------------------------- |
+| `/health`  | Liveness probe — used by Docker   |
+| `/docs`    | Swagger UI (auto-generated)       |
+| `/graphql` | GraphQL endpoint (see next section) |
+
+Additional routers under `src/exegia/routers/` (e.g. corpora upload/list) are wired in `src/exegia/__init__.py`.
 
 ---
 
@@ -147,11 +241,11 @@ query {
 | Type          | Key fields                                                                                                        |
 | ------------- | ----------------------------------------------------------------------------------------------------------------- |
 | `Corpus`      | `name`, `nodeTypes`, `featureCount`, `books`                                                                      |
-| `Book`        | `name`, `chapters`                                                                                               |
-| `Chapter`     | `reference`, `verses`                                                                                            |
-| `Verse`       | `reference`, `text`, `words`                                                                                     |
+| `Book`        | `name`, `chapters`                                                                                                |
+| `Chapter`     | `reference`, `verses`                                                                                             |
+| `Verse`       | `reference`, `text`, `words`                                                                                      |
 | `Word`        | `text`, `lemma`, `partOfSpeech`, `gloss`, `gender`, `number`, `person`, `verbStem`, `verbTense`, `feature(name)` |
-| `SearchMatch` | `reference`, `text`                                                                                              |
+| `SearchMatch` | `reference`, `text`                                                                                               |
 
 Field names use natural language (`lemma`, `partOfSpeech`) instead of raw corpus shorthand (`lex`, `sp`). Use the `feature(name)` escape hatch to access any raw feature directly.
 
@@ -275,6 +369,20 @@ uv run pytest
 uv build --out-dir dist/
 ```
 
+### Build the Docker image manually
+
+`scripts/start.py` rebuilds for you, but if you need to test image layers in isolation:
+
+```bash
+docker buildx build --target runtime -t exegia-api:dev --load .
+```
+
+### Generate self-signed certs for the Caddy reverse proxy
+
+```bash
+uv run scripts/generate_ssl.py
+```
+
 ### Publish
 
 ```bash
@@ -289,15 +397,26 @@ uv run scripts/publish.py 1.2.3    # explicit version
 backend/
 ├── pyproject.toml       # Package config (hatchling build)
 ├── uv.lock
+├── main.py              # ASGI entrypoint (`main:app`)
+├── Dockerfile           # Multi-stage build: uv (builder) → python:3.13-slim (runtime)
+├── compose.yml          # Dev stack: app + dev-gui + caddy
+├── Caddyfile            # Reverse proxy + local TLS
+├── .env.example         # Plain placeholder env (committed)
+├── .env.development     # dotenvx-encrypted env (committed)
+├── .env.keys            # dotenvx private keys (gitignored)
 ├── scripts/
-│   ├── setup.py         # Install deps + dotenvx
-│   ├── clean.py         # Remove caches and build artifacts
-│   ├── stop.py          # Stop local uvicorn processes
+│   ├── setup.py         # `uv sync` + dotenvx bootstrap
+│   ├── start.py         # docker compose up (with .env.keys injection)
+│   ├── stop.py          # docker compose down (+ optional --volumes)
+│   ├── dev_gui.py       # NiceGUI dev harness for the corpora API
+│   ├── clean.py         # Remove caches + build artifacts
+│   ├── generate_ssl.py  # Self-signed certs for the Caddy proxy
 │   ├── publish.py       # Build + publish helper
 │   └── work.py          # Git workflow helper
 ├── .github/
 │   └── workflows/
 │       └── publish.yml  # CI: build + publish on tag push
+├── app/                 # FastAPI app config (config, settings)
 └── src/
     └── exegia/
         ├── auth/        # Auth utilities
@@ -305,6 +424,21 @@ backend/
         ├── graphql/     # Strawberry GraphQL schema
         ├── mcp/         # FastMCP server (cf-mcp entrypoint)
         ├── models/      # Enums and data model definitions
+        ├── routers/     # FastAPI REST routers
         ├── schemas/     # Pydantic API schemas
         └── utils/       # EPUB/HTML → TF converters
 ```
+
+---
+
+## Troubleshooting
+
+| Symptom                                                                | Likely cause                                                                                                       | Fix                                                                                  |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| `error: .env.keys not found`                                           | The private key file is gitignored and missing on this checkout.                                                   | Restore it from your team's password manager / secrets store.                        |
+| `required variable DOTENV_PRIVATE_KEY_DEVELOPMENT is missing a value`  | Compose tried to start but the key wasn't in the env. `start.py` loads `.env.keys` automatically — check that file has the variable. | Verify `.env.keys` contains `DOTENV_PRIVATE_KEY_DEVELOPMENT=…`.                      |
+| `error: Docker daemon is not reachable`                                | Docker Desktop / engine is not running.                                                                            | Start Docker Desktop, then re-run `uv run scripts/start.py`.                         |
+| `dotenvx: command not found` inside the container                      | Image was built before `dotenvx` was added to the Dockerfile.                                                      | Rebuild: `uv run scripts/start.py` (without `--no-build`).                           |
+| Port 8000 / 8080 / 80 / 443 already in use                             | Another local service is bound there.                                                                              | Stop the conflicting service, or edit `compose.yml` host-port mappings.              |
+| Healthcheck stuck on `health: starting`                                | App still booting (uvicorn `--reload` import takes a few seconds on first start).                                  | Wait ~15s. If it stays unhealthy, run `docker compose logs app`.                     |
+

@@ -18,9 +18,9 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from postgrest.exceptions import APIError
 from supabase import Client
 
-from app.config import Settings, get_settings
 from exegia.schemas import ConvertCorpusResponse, Corpus, CorpusMetadata
 from exegia.utils.connect import get_anon_client, get_service_client
+from scripts.config import Settings, get_settings
 
 logger = logging.getLogger(__name__)
 

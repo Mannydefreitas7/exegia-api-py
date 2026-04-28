@@ -14,7 +14,7 @@ from functools import lru_cache
 
 from supabase import Client, ClientOptions, create_client
 
-from app.config import Settings, get_settings
+from scripts.config import Settings, get_settings
 
 
 def _make_client(url: str, key: str) -> Client:
@@ -27,16 +27,15 @@ def _make_client(url: str, key: str) -> Client:
     return create_client(
         url,
         key,
-        options=ClientOptions(
-            auto_refresh_token=False,
-            persist_session=False
-        ),
+        options=ClientOptions(auto_refresh_token=False, persist_session=False),
     )
+
 
 @lru_cache(maxsize=1)
 def get_anon_client() -> Client:
     settings: Settings = get_settings()
     return _make_client(settings.supabase_url, settings.supabase_publishable_key)
+
 
 @lru_cache(maxsize=1)
 def get_service_client() -> Client:

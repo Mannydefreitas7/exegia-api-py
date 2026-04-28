@@ -1,6 +1,5 @@
 #!/usr/bin/env python
-"""
-Dev GUI for testing Exegia corpora API endpoints.
+"""Dev GUI for testing Exegia corpora API endpoints.
 
 Tabs:
   - List Corpora  → GET /api/corpora (filterable, paginated table)
@@ -8,44 +7,90 @@ Tabs:
   - Upload        → POST /api/corpora/convert (multipart → Edge Function)
 
 Run:
-    uv run Python scripts/dev_gui.py
-    uv run Python scripts/dev_gui.py --base-url http://localhost:8000
+    uv run python scripts/dev_gui.py
+    uv run python scripts/dev_gui.py --base-url http://localhost:8000
 """
 
 from __future__ import annotations
 
-import asyncio
 import json
 import sys
 from typing import Any
 
 import httpx
-from nicegui import events, ui
+from fasthtml.common import (
+    A,
+    Code,
+    Div,
+    Li,
+    Main,
+    P,
+    Pre,
+    Span,
+    Title,
+    Ul,
+    UploadFile,
+    serve,
+)
+from monsterui.all import (
+    H3,
+    Button,
+    ButtonT,
+    Card,
+    Details,
+    DivFullySpaced,
+    DivHStacked,
+    Form,
+    Grid,
+    Input,
+    Label,
+    LabelInput,
+    Summary,
+    TableFromLists,
+    TableT,
+    Theme,
+    fast_app,
+)
+from monsterui.franken import H2
 
-_state: dict[str, Any] = {"base_url": "http://localhost:8000"}
+_DEFAULT_BASE_URL = "http://127.0.0.1:54321"
+
+if "--base-url" in sys.argv:
+    _idx = sys.argv.index("--base-url")
+    if _idx + 1 < len(sys.argv):
+        _DEFAULT_BASE_URL = sys.argv[_idx + 1].rstrip("/")
+
+
+app, rt = fast_app(
+    hdrs=(Theme.neutral.headers()),
+    secret_key="exegia-dev-gui-2024",
+    pico=False,
+    live=True,
+)
 
 
 # ── HTTP helpers ──────────────────────────────────────────────────────────────
 
 
-async def _get(path: str, **params: Any) -> tuple[int, Any]:
+async def _get(base_url: str, path: str, **params: Any) -> tuple[int, Any]:
     clean = {k: v for k, v in params.items() if v is not None and v != ""}
     try:
-        async with httpx.AsyncClient(base_url=_state["base_url"], timeout=10) as c:
+        async with httpx.AsyncClient(base_url=base_url, timeout=10) as c:
             r = await c.get(path, params=clean)
         try:
             return r.status_code, r.json()
         except Exception:
             return r.status_code, r.text
     except httpx.ConnectError:
-        return 0, f"Cannot connect to {_state['base_url']} — is the API server running?"
+        return 0, f"Cannot connect to {base_url} — is the API server running?"
     except httpx.ReadTimeout:
-        return 0, f"Request timed out — {_state['base_url']}{path}"
+        return 0, f"Request timed out — {base_url}{path}"
     except Exception as exc:
         return 0, f"Network error: {exc}"
 
 
 async def _post_multipart(
+    base_url: str,
     path: str,
     data: dict[str, Any],
     file_name: str,
@@ -53,346 +98,345 @@ async def _post_multipart(
     mime: str,
 ) -> tuple[int, Any]:
     try:
-        async with httpx.AsyncClient(base_url=_state["base_url"], timeout=60) as c:
-            files = {"file": (file_name, file_bytes, mime)}
-            r = await c.post(path, data=data, files=files)
+        async with httpx.AsyncClient(base_url=base_url, timeout=60) as c:
+            r = await c.post(
+                path, data=data, files={"file": (file_name, file_bytes, mime)}
+            )
         try:
             return r.status_code, r.json()
         except Exception:
             return r.status_code, r.text
     except httpx.ConnectError:
-        return 0, f"Cannot connect to {_state['base_url']} — is the API server running?"
+        return 0, f"Cannot connect to {base_url} — is the API server running?"
     except httpx.ReadTimeout:
-        return 0, f"Request timed out uploading to {_state['base_url']}{path}"
+        return 0, f"Request timed out uploading to {base_url}{path}"
     except Exception as exc:
         return 0, f"Network error: {exc}"
 
 
-def _json_display(parent: ui.card, code: int, body: Any) -> None:
-    """Render a status badge + formatted JSON inside a card."""
+# ── UI helpers ────────────────────────────────────────────────────────────────
+
+
+def _result_view(code: int, body: Any):
     if code == 0:
-        color = "warning"
-        label = "Unreachable"
+        badge_cls, label = "bg-yellow-100 text-yellow-800", "Unreachable"
     elif code < 400:
-        color = "positive"
-        label = f"HTTP {code}"
+        badge_cls, label = "bg-green-100 text-green-800", f"HTTP {code}"
     else:
-        color = "negative"
-        label = f"HTTP {code}"
-    with parent:
-        ui.badge(label, color=color).classes("text-sm mb-2")
-        if isinstance(body, str):
-            ui.label(body).classes("text-sm text-gray-600")
-        else:
-            ui.code(json.dumps(body, indent=2, default=str)).classes("w-full text-xs")
+        badge_cls, label = "bg-red-100 text-red-800", f"HTTP {code}"
+    text = body if isinstance(body, str) else json.dumps(body, indent=2, default=str)
+    return Div(
+        Span(
+            label,
+            cls=f"inline-block text-xs font-semibold px-2 py-1 rounded mb-2 {badge_cls}",
+        ),
+        Pre(
+            Code(text),
+            cls="text-xs overflow-auto bg-neutral-50 dark:bg-neutral-900 p-3 rounded border border-neutral-200 dark:border-neutral-700",
+        ),
+    )
+
+
+# ── Tab nav ───────────────────────────────────────────────────────────────────
+
+_TABS = [("list", "List Corpora"), ("get", "Get Corpus"), ("upload", "Upload")]
+
+
+def _tab_nav(active: str, oob: bool = False):
+    items = []
+    for key, label in _TABS:
+        link_cls = (
+            "block px-4 py-2 text-sm font-medium border-b-2 cursor-pointer transition-colors "
+            + (
+                "border-neutral-900 text-neutral-900 dark:border-neutral-100 dark:text-neutral-100"
+                if key == active
+                else "border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300 dark:hover:text-neutral-300 dark:hover:border-neutral-600"
+            )
+        )
+        items.append(
+            Li(
+                A(
+                    label,
+                    cls=link_cls,
+                    hx_get=f"/tab/{key}",
+                    hx_target="#tab-content",
+                    hx_swap="innerHTML",
+                )
+            )
+        )
+    kw: dict[str, Any] = {
+        "id": "tab-nav",
+        "cls": "flex border-b border-neutral-200 dark:border-neutral-700 mb-4",
+    }
+    if oob:
+        kw["hx_swap_oob"] = "true"
+    return Ul(*items, **kw)
+
+
+@rt("/tab/{key}")
+def tab_page(key: str):
+    fn = {"list": _list_tab, "get": _get_tab, "upload": _upload_tab}.get(key, _list_tab)
+    return _tab_nav(key, oob=True), fn()
 
 
 # ── List Corpora tab ──────────────────────────────────────────────────────────
 
-COLUMNS = [
-    {
-        "name": "name",
-        "label": "Name",
-        "field": "name",
-        "sortable": True,
-        "align": "left",
-    },
-    {
-        "name": "language",
-        "label": "Lang",
-        "field": "language",
-        "sortable": True,
-        "align": "left",
-    },
-    {
-        "name": "type",
-        "label": "Type",
-        "field": "type",
-        "sortable": True,
-        "align": "left",
-    },
-    {"name": "period", "label": "Period", "field": "period", "align": "left"},
-    {"name": "category", "label": "Category", "field": "category", "align": "left"},
-    {"name": "version", "label": "Ver", "field": "version", "align": "right"},
-    {
-        "name": "created_at",
-        "label": "Created",
-        "field": "created_at",
-        "sortable": True,
-        "align": "left",
-    },
-]
 
-
-def _build_list_tab() -> None:
-    with ui.row().classes("w-full gap-3 items-end flex-wrap mb-2"):
-        lang = (
-            ui.input("Language", placeholder="grc / hbo")
-            .props("dense outlined clearable")
-            .classes("w-32")
-        )
-        typ = (
-            ui.input("Type", placeholder="text")
-            .props("dense outlined clearable")
-            .classes("w-28")
-        )
-        limit = (
-            ui.number("Limit", value=50, min=1, max=200)
-            .props("dense outlined")
-            .classes("w-20")
-        )
-        offset = (
-            ui.number("Offset", value=0, min=0).props("dense outlined").classes("w-20")
-        )
-        refresh_btn = ui.button("Refresh", icon="refresh").props("flat color=indigo")
-
-    table = (
-        ui.table(columns=COLUMNS, rows=[], row_key="uuid")
-        .classes("w-full")
-        .props("dense")
+def _list_tab():
+    return Div(
+        Form(
+            DivHStacked(
+                Input(name="language", placeholder="grc / hbo", cls="w-28"),
+                Input(name="type", placeholder="text", cls="w-24"),
+                Input(
+                    name="limit",
+                    type="number",
+                    value="50",
+                    min="1",
+                    max="200",
+                    cls="w-20",
+                ),
+                Input(name="offset", type="number", value="0", min="0", cls="w-20"),
+                Button("Refresh", cls=ButtonT.default),
+                cls="gap-3 items-end flex-wrap mb-3",
+            ),
+            hx_get="/list-results",
+            hx_target="#list-table",
+            hx_swap="innerHTML",
+            hx_trigger="submit, load",
+        ),
+        P("", id="list-status", cls="text-xs text-neutral-400 mb-2"),
+        Div(id="list-table"),
     )
-    table.add_slot(
-        "body-cell-name",
-        '<q-td :props="props">'
-        '<span class="font-mono text-indigo-700 font-semibold">{{ props.value }}</span>'
-        "</q-td>",
+
+
+@rt("/list-results")
+async def list_results(
+    sess, language: str = "", type: str = "", limit: int = 50, offset: int = 0
+):
+    base_url = sess.get("base_url", _DEFAULT_BASE_URL)
+    code, data = await _get(
+        base_url,
+        "/api/corpora",
+        language=language or None,
+        type=type or None,
+        limit=limit,
+        offset=offset,
     )
-    status_lbl = ui.label("").classes("text-xs text-gray-400 mt-1")
-
-    async def refresh() -> None:
-        refresh_btn.props("loading")
-        status_lbl.text = "Loading…"
-        code, data = await _get(
-            "/api/corpora",
-            language=lang.value or None,
-            type=typ.value or None,
-            limit=int(limit.value or 50),
-            offset=int(offset.value or 0),
+    if code == 200:
+        rows = [{**c, "category": ", ".join(c.get("category") or [])} for c in data]
+        fields = [
+            "name",
+            "language",
+            "type",
+            "period",
+            "category",
+            "version",
+            "created_at",
+        ]
+        headers = ["Name", "Lang", "Type", "Period", "Category", "Ver", "Created"]
+        body = [[str(r.get(f, "")) for f in fields] for r in rows]
+        return (
+            P(
+                f"{len(rows)} corpus(es) returned",
+                id="list-status",
+                hx_swap_oob="true",
+                cls="text-xs text-neutral-400 mb-2",
+            ),
+            TableFromLists(
+                headers, body, cls=TableT.hover + TableT.divider + TableT.sm
+            ),
         )
-        refresh_btn.props(remove="loading")
-        if code == 200:
-            rows = [{**c, "category": ", ".join(c.get("category") or [])} for c in data]
-            table.rows = rows
-            status_lbl.text = f"{len(rows)} corpus(es) returned"
-        elif code == 0:
-            try:
-                ui.notify(str(data), type="warning")
-            except RuntimeError:
-                pass
-            status_lbl.text = str(data)
-        else:
-            try:
-                ui.notify(f"Error {code}: {data}", type="negative")
-            except RuntimeError:
-                pass
-            status_lbl.text = f"Error {code}"
-
-    refresh_btn.on("click", lambda: asyncio.ensure_future(refresh()))
-    ui.timer(0.1, refresh, once=True)
+    else:
+        return (
+            P(
+                f"Error {code}" if code else str(data)[:80],
+                id="list-status",
+                hx_swap_oob="true",
+                cls="text-xs text-red-400 mb-2",
+            ),
+            _result_view(code, data),
+        )
 
 
 # ── Get Corpus tab ────────────────────────────────────────────────────────────
 
 
-def _build_get_tab() -> None:
-    with ui.row().classes("w-full gap-3 items-end mb-2"):
-        name_in = (
-            ui.input("Corpus name", placeholder="bhsa")
-            .props("dense outlined")
-            .classes("flex-1")
-        )
-        fetch_btn = ui.button("Fetch", icon="search").props("color=indigo")
+def _get_tab():
+    return Div(
+        Form(
+            DivHStacked(
+                Input(name="name", placeholder="bhsa", cls="flex-1"),
+                Button("Fetch", cls=ButtonT.default),
+                cls="gap-3 items-end mb-3",
+            ),
+            hx_get="/get-result",
+            hx_target="#get-result",
+            hx_swap="innerHTML",
+        ),
+        Div(id="get-result"),
+    )
 
-    result_card = ui.card().classes("w-full hidden")
 
-    async def fetch() -> None:
-        n = name_in.value.strip()
-        if not n:
-            ui.notify("Enter a corpus name", type="warning")
-            return
-        fetch_btn.props("loading")
-        code, data = await _get(f"/api/corpora/{n}")
-        fetch_btn.props(remove="loading")
-        result_card.clear()
-        result_card.classes(remove="hidden")
-        _json_display(result_card, code, data)
-
-    fetch_btn.on("click", lambda: asyncio.ensure_future(fetch()))
-    name_in.on("keydown.enter", lambda: asyncio.ensure_future(fetch()))
+@rt("/get-result")
+async def get_result(sess, name: str = ""):
+    if not name.strip():
+        return P("Enter a corpus name", cls="text-sm text-yellow-600")
+    base_url = sess.get("base_url", _DEFAULT_BASE_URL)
+    code, data = await _get(base_url, f"/api/corpora/{name.strip()}")
+    return _result_view(code, data)
 
 
 # ── Upload tab ────────────────────────────────────────────────────────────────
 
 
-def _build_upload_tab() -> None:
-    _file: dict[str, Any] = {}
-
-    with ui.card().classes("w-full"):
-        ui.label("Convert & upload corpus").classes("text-lg font-semibold mb-3")
-
-        with ui.grid(columns=2).classes("w-full gap-x-4 gap-y-2"):
-            name_in = (
-                ui.input("Name *", placeholder="bhsa")
-                .props("dense outlined")
-                .classes("w-full")
-            )
-            type_in = (
-                ui.input("Type *", placeholder="text")
-                .props("dense outlined")
-                .classes("w-full")
-            )
-            lang_in = (
-                ui.input("Language *", placeholder="hbo")
-                .props("dense outlined")
-                .classes("w-full")
-            )
-            period_in = (
-                ui.input("Period *", placeholder="ancient")
-                .props("dense outlined")
-                .classes("w-full")
-            )
-
-        repo_in = (
-            ui.input("Repository *", placeholder="https://github.com/ETCBC/bhsa")
-            .props("dense outlined")
-            .classes("w-full mt-2")
-        )
-        cat_in = (
-            ui.input("Category * (comma-separated)", placeholder="bible, ot")
-            .props("dense outlined")
-            .classes("w-full mt-1")
-        )
-
-        with ui.expansion("Optional fields", icon="expand_more").classes("w-full mt-2"):
-            desc_in = ui.textarea("Description").props("outlined").classes("w-full")
-            with ui.row().classes("w-full gap-3 mt-1"):
-                lic_in = ui.input("Licence").props("dense outlined").classes("flex-1")
-                cred_in = ui.input("Credits").props("dense outlined").classes("flex-1")
-
-        file_lbl = ui.label("No file selected").classes("text-xs text-gray-400 mt-3")
-
-        def on_upload(e: events.UploadEventArguments) -> None:
-            _file["name"] = e.name
-            _file["bytes"] = e.content.read()
-            _file["mime"] = e.type or "application/zip"
-            size_kb = len(_file["bytes"]) / 1024
-            file_lbl.text = f"Ready: {e.name} ({size_kb:,.1f} KB)"
-            ui.notify(f"File ready: {e.name}", type="positive")
-
-        ui.upload(
-            label="Corpus archive (.zip)",
-            on_upload=on_upload,
-            max_file_size=500_000_000,
-            auto_upload=True,
-        ).props("accept=.zip flat bordered").classes("w-full mt-1")
-
-    result_card = ui.card().classes("w-full mt-3 hidden")
-
-    async def submit() -> None:
-        required = [
-            name_in.value,
-            type_in.value,
-            lang_in.value,
-            period_in.value,
-            repo_in.value,
-            cat_in.value,
-        ]
-        if not all(required):
-            ui.notify("Fill in all required (*) fields", type="warning")
-            return
-        if not _file:
-            ui.notify("Upload a .zip file first", type="warning")
-            return
-
-        cats = [c.strip() for c in cat_in.value.split(",") if c.strip()]
-        form: dict[str, Any] = {
-            "name": name_in.value.strip(),
-            "type": type_in.value.strip(),
-            "language": lang_in.value.strip(),
-            "period": period_in.value.strip(),
-            "repository": repo_in.value.strip(),
-            "category": cats,
-        }
-        if desc_in.value:
-            form["description"] = desc_in.value
-        if lic_in.value:
-            form["licence"] = lic_in.value
-        if cred_in.value:
-            form["credits"] = cred_in.value
-
-        submit_btn.props("loading")
-        code, resp = await _post_multipart(
-            "/api/corpora/convert",
-            data=form,
-            file_name=_file["name"],
-            file_bytes=_file["bytes"],
-            mime=_file["mime"],
-        )
-        submit_btn.props(remove="loading")
-
-        result_card.clear()
-        result_card.classes(remove="hidden")
-        if code in (200, 202):
-            ui.notify("Corpus conversion started!", type="positive")
-            with result_card:
-                ui.badge(f"HTTP {code}", color="positive").classes("mb-2")
-                with ui.row().classes("gap-4 flex-wrap"):
-                    for key, val in resp.items():
-                        with ui.card().tight().classes("p-3 bg-gray-50"):
-                            ui.label(key).classes(
-                                "text-xs text-gray-500 uppercase tracking-wide"
-                            )
-                            ui.label(str(val)).classes(
-                                "font-mono font-medium text-sm mt-1"
-                            )
-        else:
-            ui.notify(f"Error {code}", type="negative")
-            _json_display(result_card, code, resp)
-
-    submit_btn = ui.button(
-        "Submit", icon="cloud_upload", on_click=lambda: asyncio.ensure_future(submit())
-    ).classes("mt-3")
+def _upload_tab():
+    return Div(
+        Form(
+            Card(
+                H3("Convert & upload corpus", cls="text-lg font-semibold mb-4"),
+                Grid(
+                    LabelInput("Name", id="name", placeholder="bhsa"),
+                    LabelInput("Type", id="type", placeholder="text"),
+                    LabelInput("Language", id="language", placeholder="hbo"),
+                    LabelInput("Period", id="period", placeholder="ancient"),
+                    cols=2,
+                    cls="gap-4 mb-2",
+                ),
+                LabelInput(
+                    "Repository",
+                    id="repository",
+                    placeholder="https://github.com/ETCBC/bhsa",
+                    cls="mb-1",
+                ),
+                LabelInput(
+                    "Category (comma-separated)",
+                    id="category",
+                    placeholder="bible, ot",
+                    cls="mb-2",
+                ),
+                Details(
+                    Summary(
+                        "Optional fields",
+                        cls="text-sm text-neutral-500 cursor-pointer mb-2",
+                    ),
+                    Div(
+                        LabelInput("Description", id="description"),
+                        DivHStacked(
+                            LabelInput("Licence", id="licence", cls="flex-1"),
+                            LabelInput("Credits", id="credits", cls="flex-1"),
+                            cls="gap-3 mt-1",
+                        ),
+                        cls="mt-2 space-y-2",
+                    ),
+                    cls="mt-2",
+                ),
+                Div(
+                    Label("Corpus archive (.zip)", cls="text-sm font-medium"),
+                    Input(
+                        type="file", name="file", accept=".zip", cls="mt-1 block w-full"
+                    ),
+                    cls="mt-3",
+                ),
+            ),
+            Button("Submit", cls=ButtonT.primary, type="submit"),
+            hx_post="/upload-result",
+            hx_target="#upload-result",
+            hx_swap="innerHTML",
+            enctype="multipart/form-data",
+            cls="space-y-3",
+        ),
+        Div(id="upload-result", cls="mt-3"),
+    )
 
 
-# ── Page ──────────────────────────────────────────────────────────────────────
+@rt("/upload-result")
+async def upload_result(
+    sess,
+    file: UploadFile,
+    name: str = "",
+    type: str = "",
+    language: str = "",
+    period: str = "",
+    repository: str = "",
+    category: str = "",
+    description: str = "",
+    licence: str = "",
+    credits: str = "",
+):
+    # if not all(f.strip() for f in [name, type, language, period, repository, category]):
+    #     return P("Fill in all required (*) fields", cls="text-red-600 text-sm")
+    if not file or not file.filename:
+        return P("Upload a .zip file first", cls="text-yellow-600 text-sm")
+
+    file_bytes = await file.read()
+    form_data: dict[str, Any] = {
+        "name": name.strip(),
+        "type": type.strip(),
+        "language": language.strip(),
+        "period": period.strip(),
+        "repository": repository.strip(),
+        "category": [c.strip() for c in category.split(",") if c.strip()],
+    }
+    if description:
+        form_data["description"] = description
+    if licence:
+        form_data["licence"] = licence
+    if credits:
+        form_data["credits"] = credits
+
+    base_url = sess.get("base_url", _DEFAULT_BASE_URL)
+    code, resp = await _post_multipart(
+        base_url,
+        "/api/corpora/convert",
+        data=form_data,
+        file_name=file.filename,
+        file_bytes=file_bytes,
+        mime=file.content_type or "application/zip",
+    )
+    return _result_view(code, resp)
 
 
-@ui.page("/")
-def index() -> None:
-    ui.query("body").style("background: #f8fafc")
-
-    with ui.header().classes(
-        "bg-indigo-700 text-white flex items-center gap-3 px-6 py-3 shadow-md"
-    ):
-        ui.icon("menu_book", size="2rem")
-        ui.label("Exegia Corpus Dev GUI").classes("text-xl font-semibold flex-1")
-        url_in = (
-            ui.input(value=_state["base_url"])
-            .props("dense dark outlined label='API Base URL'")
-            .classes("w-80 text-sm")
-        )
-        url_in.on(
-            "change", lambda e: _state.update(base_url=str(e.value or "").rstrip("/"))
-        )
-
-    with ui.tabs().classes("w-full bg-white shadow-sm") as tabs:
-        t_list = ui.tab("list", label="List Corpora", icon="list")
-        t_get = ui.tab("get", label="Get Corpus", icon="search")
-        t_upload = ui.tab("upload", label="Upload", icon="cloud_upload")
-
-    with ui.tab_panels(tabs, value=t_list).classes("w-full"):
-        with ui.tab_panel(t_list).classes("p-4"):
-            _build_list_tab()
-        with ui.tab_panel(t_get).classes("p-4"):
-            _build_get_tab()
-        with ui.tab_panel(t_upload).classes("p-4"):
-            _build_upload_tab()
+# ── Main page ─────────────────────────────────────────────────────────────────
 
 
-if __name__ in {"__main__", "__mp_main__"}:
-    if "--base-url" in sys.argv:
-        idx = sys.argv.index("--base-url")
-        if idx + 1 < len(sys.argv):
-            _state["base_url"] = sys.argv[idx + 1].rstrip("/")
+@rt("/")
+def index(sess):
+    base_url = sess.get("base_url", _DEFAULT_BASE_URL)
+    return Title("Exegia Dev GUI"), Main(
+        Div(
+            DivFullySpaced(
+                DivHStacked(
+                    Span("📚", cls="text-2xl"),
+                    H2("Exegia Corpus Dev GUI", cls="text-xl font-semibold text-white"),
+                    cls="gap-3 items-center",
+                ),
+                Form(
+                    Input(
+                        name="base_url",
+                        value=base_url,
+                        placeholder="http://localhost:8000",
+                        cls="w-80 text-sm bg-neutral-800 text-white border-neutral-600 rounded px-3 py-1",
+                    ),
+                    hx_post="/set-base-url",
+                    hx_trigger="change from:input",
+                    hx_swap="none",
+                ),
+            ),
+            cls="bg-neutral-950 px-6 py-3",
+        ),
+        Div(
+            _tab_nav("list"),
+            Div(_list_tab(), id="tab-content"),
+            cls="p-4",
+        ),
+        cls="min-h-screen bg-neutral-50 dark:bg-neutral-950",
+    )
 
-    ui.run(title="Exegia Dev GUI", port=8080, reload=False, favicon="📚")
+
+@rt("/set-base-url")
+def set_base_url(sess, base_url: str = ""):
+    sess["base_url"] = (base_url or _DEFAULT_BASE_URL).rstrip("/")
+
+
+serve(port=8080, reload=True)
